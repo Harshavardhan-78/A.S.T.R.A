@@ -59,6 +59,16 @@ coverage.xml
 *.log
 
 # =========================
+# Model Weights
+# =========================
+models_weights/
+*.pt
+*.onnx
+*.engine
+*.pth
+*.weights
+
+# =========================
 # Python local database files
 # =========================
 *.sqlite

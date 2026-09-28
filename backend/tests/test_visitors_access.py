@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 
-from tests.test_security_parking import create_test_user
+from test_security_parking import create_test_user
 
 
 @pytest.mark.asyncio
@@ -108,6 +108,9 @@ async def test_visitor_and_access_pass_workflow(client, db):
 async def test_twilio_notification_delivery_status_tracking(db, monkeypatch):
     from app.services.notification_service import NotificationService
     from app.services.twilio_service import TwilioService
+
+    from app.config import settings
+    monkeypatch.setattr(settings, "TWILIO_ACCOUNT_SID", "")
 
     # 1. Missing credentials fallback test
     notif_unconfigured = await NotificationService.create_notification(

@@ -1,17 +1,44 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
-import { Bell, LogOut, Shield, Wifi } from 'lucide-react';
+import { Bell, LogOut, Shield, Wifi, CheckCheck, Clock, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const Header = () => {
   const { user, logout } = useAuth();
-  const { unreadCount } = useNotifications();
+  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
+  const [showDropdown, setShowDropdown] = useState(false);
+  const dropdownRef = useRef(null);
   const navigate = useNavigate();
 
   const handleLogout = async () => {
     await logout();
     navigate('/login');
+  };
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleNotificationClick = async (notif) => {
+    if (!notif.is_read) {
+      await markAsRead(notif.id);
+    }
+    setShowDropdown(false);
+
+    // If it's a registration pending notification and user is ADMIN -> navigate to Admin Users
+    if (user?.role === 'ADMIN' && (notif.title?.includes('Registration') || notif.title?.includes('SECURITY') || notif.title?.includes('VALET'))) {
+      navigate('/admin/users?status=PENDING');
+    } else {
+      navigate('/notifications');
+    }
   };
 
   return (
@@ -40,19 +67,86 @@ const Header = () => {
           <span>API Connected</span>
         </div>
 
-        {/* Notifications Bell */}
-        <button
-          onClick={() => navigate('/notifications')}
-          className="relative p-2 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-900 transition"
-          title="Notifications"
-        >
-          <Bell size={20} />
-          {unreadCount > 0 && (
-            <span className="absolute top-1 right-1 w-4 h-4 bg-rose-500 text-white font-bold text-[10px] rounded-full flex items-center justify-center animate-pulse">
-              {unreadCount}
-            </span>
+        {/* Notifications Bell & Dropdown */}
+        <div className="relative" ref={dropdownRef}>
+          <button
+            onClick={() => setShowDropdown(!showDropdown)}
+            className="relative p-2 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-900 transition"
+            title="Notifications"
+          >
+            <Bell size={20} />
+            {unreadCount > 0 && (
+              <span className="absolute top-1 right-1 w-4 h-4 bg-rose-500 text-white font-bold text-[10px] rounded-full flex items-center justify-center animate-pulse">
+                {unreadCount}
+              </span>
+            )}
+          </button>
+
+          {/* Floating Dropdown Panel */}
+          {showDropdown && (
+            <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-xl bg-slate-900 border border-slate-800 shadow-2xl z-50 overflow-hidden">
+              <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-white">Notifications</h3>
+                  {unreadCount > 0 && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 font-semibold border border-blue-500/30">
+                      {unreadCount} unread
+                    </span>
+                  )}
+                </div>
+                {unreadCount > 0 && (
+                  <button
+                    onClick={markAllAsRead}
+                    className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 font-medium transition"
+                  >
+                    <CheckCheck size={14} /> Mark all read
+                  </button>
+                )}
+              </div>
+
+              <div className="max-h-80 overflow-y-auto divide-y divide-slate-800/50">
+                {notifications.length === 0 ? (
+                  <div className="p-6 text-center text-slate-500 text-xs">
+                    No notifications available
+                  </div>
+                ) : (
+                  notifications.slice(0, 5).map((n) => (
+                    <div
+                      key={n.id}
+                      onClick={() => handleNotificationClick(n)}
+                      className={`p-3.5 transition cursor-pointer hover:bg-slate-850 flex items-start gap-3 ${
+                        !n.is_read ? 'bg-blue-500/5 border-l-2 border-blue-500' : ''
+                      }`}
+                    >
+                      <div className={`mt-0.5 p-1.5 rounded-full ${!n.is_read ? 'bg-blue-500/20 text-blue-400' : 'bg-slate-800 text-slate-500'}`}>
+                        <Bell size={14} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-semibold text-slate-200 truncate">{n.title}</div>
+                        <div className="text-[11px] text-slate-400 mt-0.5 line-clamp-2">{n.message}</div>
+                        <div className="text-[10px] text-slate-500 mt-1 flex items-center gap-1">
+                          <Clock size={10} /> {new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="p-3 bg-slate-950/80 border-t border-slate-800 text-center">
+                <button
+                  onClick={() => {
+                    setShowDropdown(false);
+                    navigate('/notifications');
+                  }}
+                  className="text-xs font-semibold text-blue-400 hover:text-blue-300 flex items-center justify-center gap-1.5 w-full py-1"
+                >
+                  View All Notifications <ExternalLink size={12} />
+                </button>
+              </div>
+            </div>
           )}
-        </button>
+        </div>
 
         {/* User Badge */}
         <div className="flex items-center gap-3 pl-2 border-l border-slate-800">

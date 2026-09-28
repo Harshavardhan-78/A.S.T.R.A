@@ -24,6 +24,11 @@ from app.models.chatbot import (
     ChatSession,
     ChatMessage,
 )
+from app.models.vehicle_inspection import (
+    VehicleInspection,
+    InspectionImage,
+    DamageDetection,
+)
 
 __all__ = [
     "Role",
@@ -47,4 +52,7 @@ __all__ = [
     "Document",
     "ChatSession",
     "ChatMessage",
+    "VehicleInspection",
+    "InspectionImage",
+    "DamageDetection",
 ]

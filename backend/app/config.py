@@ -26,6 +26,13 @@ class Settings(BaseSettings):
     SUPABASE_STORAGE_URL: str | None = os.getenv("SUPABASE_STORAGE_URL")
     SUPABASE_STORAGE_KEY: str | None = os.getenv("SUPABASE_STORAGE_KEY")
 
+    # Vehicle Damage Model & Comparison settings
+    DAMAGE_MODEL_PATH: str = os.getenv("DAMAGE_MODEL_PATH", "models_weights/vehicle_damage_yolov8.pt")
+    DAMAGE_CONFIDENCE_THRESHOLD: float = float(os.getenv("DAMAGE_CONFIDENCE_THRESHOLD", "0.25"))
+    DAMAGE_DEVICE: str = os.getenv("DAMAGE_DEVICE", "auto")  # "auto", "cuda", "cpu"
+    DAMAGE_LOCATION_MATCH_THRESHOLD: float = float(os.getenv("DAMAGE_LOCATION_MATCH_THRESHOLD", "0.30"))
+    DAMAGE_WORSENING_THRESHOLD: float = float(os.getenv("DAMAGE_WORSENING_THRESHOLD", "1.40"))
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 

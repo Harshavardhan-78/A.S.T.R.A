@@ -75,6 +75,28 @@ class AdminService:
         await db.commit()
         await db.refresh(user)
 
+        # Notify target user if APPROVED or REJECTED
+        if status_clean in ["ACTIVE", "REJECTED"]:
+            from app.services.notification_service import NotificationService
+            r_res = await db.execute(select(Role).where(Role.id == user.role_id))
+            user_role = r_res.scalar_one_or_none()
+            role_name = user_role.name if user_role else "account"
+
+            if status_clean == "ACTIVE":
+                notif_title = "Account Approved"
+                notif_msg = f"Your {role_name} account has been approved. You can now log in."
+            else:
+                notif_title = "Registration Rejected"
+                notif_msg = f"Your {role_name} registration was rejected by the administrator."
+
+            await NotificationService.create_notification(
+                db=db,
+                user_id=user.id,
+                title=notif_title,
+                message=notif_msg,
+                notification_type="IN_APP",
+            )
+
         return {
             "message": f"User status updated to {status_clean} successfully",
             "user_id": user.id,

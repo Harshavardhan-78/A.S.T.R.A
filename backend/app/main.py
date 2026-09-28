@@ -65,6 +65,13 @@ app.include_router(analytics_router)
 app.include_router(admin_router)
 
 
+@app.on_event("startup")
+async def startup_event():
+    from app.services.damage_service import DamageService
+    detector = DamageService.get_detector()
+    print(f"Damage model device: {detector.device}")
+
+
 @app.get("/")
 def root():
     return {"message": "Welcome to A.S.T.R.A"}
@@ -72,4 +79,10 @@ def root():
 
 @app.get("/health")
 def health_check():
-    return {"status": "healthy", "application": "A.S.T.R.A"}
+    from app.services.damage_service import DamageService
+    detector = DamageService.get_detector()
+    return {
+        "status": "healthy",
+        "application": "A.S.T.R.A",
+        "damage_model_device": detector.device,
+    }

@@ -11,4 +11,6 @@ class NotificationResponse(BaseModel):
     message: str
     notification_type: str
     is_read: bool
+    delivery_channel: str | None = "IN_APP"
+    delivery_status: str | None = "DELIVERED"
     created_at: datetime

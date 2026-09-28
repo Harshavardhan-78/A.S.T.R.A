@@ -20,7 +20,7 @@ async def test_ai_services_graceful_fallbacks(client):
     assert ocr_res.status_code == 200
     assert "status" in ocr_res.json()
 
-    # 2. LPR Recognize Test
+    # 2. LPR Recognize Test (Invalid/no-text image -> NOT_VERIFIED)
     lpr_res = await client.post(
         "/lpr/recognize",
         headers=headers,
@@ -29,6 +29,8 @@ async def test_ai_services_graceful_fallbacks(client):
     assert lpr_res.status_code == 200
     lpr_data = lpr_res.json()
     assert "authorization_status" in lpr_data
+    assert lpr_data["authorization_status"] == "NOT_VERIFIED"
+    assert lpr_data["detected_plate"] is None
 
     # 3. Damage Analyze Test
     dmg_res = await client.post(

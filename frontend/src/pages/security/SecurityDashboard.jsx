@@ -205,7 +205,10 @@ export default function SecurityDashboard() {
           </div>
           <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#f8fafc' }}>Gate Control & Verification</h1>
         </div>
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          <Link to="/shared/ai-utilities" className="btn btn-secondary">
+            Vehicle Damage Inspection
+          </Link>
           <Link to="/security/history" className="btn btn-secondary">
             Gate Log History
           </Link>

@@ -10,19 +10,26 @@ export default function AdminDashboard() {
   const [overview, setOverview] = useState(null);
   const [parkingMetrics, setParkingMetrics] = useState(null);
   const [securityMetrics, setSecurityMetrics] = useState(null);
+  const [pendingCounts, setPendingCounts] = useState({ SECURITY: 0, VALET: 0 });
   const [loading, setLoading] = useState(true);
 
   const fetchAnalytics = async () => {
     setLoading(true);
     try {
-      const [oRes, pRes, sRes] = await Promise.all([
+      const [oRes, pRes, sRes, uRes] = await Promise.all([
         api.get('/analytics/overview'),
         api.get('/analytics/parking'),
-        api.get('/analytics/security')
+        api.get('/analytics/security'),
+        api.get('/admin/users')
       ]);
       setOverview(oRes.data || {});
       setParkingMetrics(pRes.data || {});
       setSecurityMetrics(sRes.data || {});
+      
+      const users = uRes.data || [];
+      const secPending = users.filter(u => u.role === 'SECURITY' && u.status === 'PENDING').length;
+      const valetPending = users.filter(u => u.role === 'VALET' && u.status === 'PENDING').length;
+      setPendingCounts({ SECURITY: secPending, VALET: valetPending });
     } catch (err) {
       console.error('Failed to load admin analytics:', err);
     } finally {
@@ -35,6 +42,8 @@ export default function AdminDashboard() {
   }, []);
 
   if (loading) return <LoadingSpinner label="Loading Administrator Command Center..." />;
+
+  const totalPending = pendingCounts.SECURITY + pendingCounts.VALET;
 
   return (
     <div>
@@ -56,8 +65,8 @@ export default function AdminDashboard() {
             </p>
           </div>
           <div style={{ display: 'flex', gap: '12px' }}>
-            <Link to="/admin/users" className="btn btn-primary">
-              <Users size={16} /> User RBAC Management
+            <Link to="/admin/users?status=PENDING" className="btn btn-primary">
+              <Users size={16} /> Review Pending Users ({totalPending})
             </Link>
             <Link to="/shared/digital-twin" className="btn btn-secondary">
               <LayoutGrid size={16} /> Digital Twin Map
@@ -76,11 +85,11 @@ export default function AdminDashboard() {
           subtitle="Registered accounts"
         />
         <StatCard
-          title="Registered Vehicles"
-          value={overview?.total_vehicles ?? 0}
-          icon={Activity}
-          color="#10b981"
-          subtitle="Resident & visitor vehicles"
+          title="Pending Approvals"
+          value={totalPending}
+          icon={Shield}
+          color={totalPending > 0 ? '#f59e0b' : '#10b981'}
+          subtitle={`SECURITY: ${pendingCounts.SECURITY} | VALET: ${pendingCounts.VALET}`}
         />
         <StatCard
           title="Parking Occupancy"
@@ -101,21 +110,30 @@ export default function AdminDashboard() {
       {/* Quick Administration Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
         
-        {/* User Management */}
-        <div className="card">
+        {/* User Management & Pending Approvals */}
+        <div className="card" style={{ border: totalPending > 0 ? '1px solid rgba(245, 158, 11, 0.4)' : undefined }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div style={{ padding: '8px', borderRadius: '8px', background: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6' }}>
                 <Users size={20} />
               </div>
-              <h2 style={{ fontSize: '18px', fontWeight: '600', color: '#f8fafc' }}>User & Role Management</h2>
+              <h2 style={{ fontSize: '18px', fontWeight: '600', color: '#f8fafc' }}>User & Registration Approvals</h2>
             </div>
+            {totalPending > 0 && (
+              <span className="badge badge-warning">
+                {totalPending} PENDING
+              </span>
+            )}
           </div>
-          <p style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '20px' }}>
-            Promote accounts to elevated roles (ADMIN, SECURITY, VALET) or inspect user directory.
+          <p style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '14px' }}>
+            Review pending Security & Valet account registrations or delegate elevated roles.
           </p>
-          <Link to="/admin/users" className="btn btn-secondary" style={{ width: '100%', justifyContent: 'center' }}>
-            Manage Users <ArrowRight size={14} />
+          <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '12px', borderRadius: '8px', marginBottom: '16px', display: 'flex', justifyContent: 'space-around', fontSize: '13px' }}>
+            <div><span style={{ color: '#64748b' }}>SECURITY:</span> <strong style={{ color: '#f8fafc' }}>{pendingCounts.SECURITY} pending</strong></div>
+            <div><span style={{ color: '#64748b' }}>VALET:</span> <strong style={{ color: '#f8fafc' }}>{pendingCounts.VALET} pending</strong></div>
+          </div>
+          <Link to="/admin/users?status=PENDING" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
+            Review Pending Users <ArrowRight size={14} />
           </Link>
         </div>
 

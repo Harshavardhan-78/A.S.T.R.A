@@ -108,6 +108,19 @@ async def register(
     msg = "User registered successfully."
     if user_status == "PENDING":
         msg = f"Registration submitted! Your {req_role} account is pending Admin approval."
+        from app.services.notification_service import NotificationService
+        admins_res = await db.execute(
+            select(User).join(Role, User.role_id == Role.id).where(Role.name == "ADMIN")
+        )
+        admin_users = admins_res.scalars().all()
+        for admin in admin_users:
+            await NotificationService.create_notification(
+                db=db,
+                user_id=admin.id,
+                title=f"New {req_role} Registration",
+                message=f"A new {req_role} account is waiting for administrator approval. User: {user.full_name}, Email: {user.email}, ID #{user.id}",
+                notification_type="IN_APP",
+            )
 
     return {
         "message": msg,
@@ -153,10 +166,16 @@ async def login(
         )
 
     # Check account status
-    if getattr(user, "status", "ACTIVE") == "PENDING":
+    user_st = getattr(user, "status", "ACTIVE")
+    if user_st == "PENDING":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Account registration is pending admin approval.",
+        )
+    elif user_st == "REJECTED":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Account registration was rejected by administrator.",
         )
 
     # Load user's role

@@ -161,3 +161,76 @@ async def test_role_based_registration_and_admin_code(client):
     assert mismatch_login.status_code == 401
     assert "Selected role does not match" in mismatch_login.json()["detail"]
 
+
+@pytest.mark.asyncio
+async def test_registration_approval_and_notifications(client, db):
+    # 1. Register Admin
+    admin_reg = await client.post(
+        "/auth/register",
+        json={
+            "full_name": "Main Admin",
+            "email": "mainadmin@astra.com",
+            "password": "Password123!",
+            "role": "ADMIN",
+            "admin_code": "ASTRA_COMMUNITY_ADMIN_2026_SECRET",
+        },
+    )
+    assert admin_reg.status_code == 201
+
+    admin_login = (await client.post("/auth/login", json={"email": "mainadmin@astra.com", "password": "Password123!", "role": "ADMIN"})).json()
+    admin_headers = {"Authorization": f"Bearer {admin_login['access_token']}"}
+
+    # 2. Register new Security user -> PENDING
+    sec_reg = await client.post(
+        "/auth/register",
+        json={
+            "full_name": "Guard Bob",
+            "email": "guardbob@astra.com",
+            "password": "Password123!",
+            "role": "SECURITY",
+        },
+    )
+    assert sec_reg.status_code == 201
+    sec_id = sec_reg.json()["user_id"]
+    assert sec_reg.json()["status"] == "PENDING"
+
+    # 3. Admin receives notification for new SECURITY registration
+    admin_notifs = (await client.get("/notifications", headers=admin_headers)).json()
+    assert any("New SECURITY Registration" in n["title"] for n in admin_notifs)
+
+    # 4. Admin Approves SECURITY User -> ACTIVE
+    app_res = await client.put(f"/admin/users/{sec_id}/status", headers=admin_headers, json={"status": "ACTIVE"})
+    assert app_res.status_code == 200
+    assert app_res.json()["status"] == "ACTIVE"
+
+    # 5. Approved Security User can log in & has received approval notification
+    sec_login = (await client.post("/auth/login", json={"email": "guardbob@astra.com", "password": "Password123!", "role": "SECURITY"})).json()
+    sec_headers = {"Authorization": f"Bearer {sec_login['access_token']}"}
+
+    sec_notifs = (await client.get("/notifications", headers=sec_headers)).json()
+    assert any("Account Approved" in n["title"] for n in sec_notifs)
+
+    # 6. Register new Valet user -> PENDING
+    valet_reg = await client.post(
+        "/auth/register",
+        json={
+            "full_name": "Valet Dave",
+            "email": "valetdave@astra.com",
+            "password": "Password123!",
+            "role": "VALET",
+        },
+    )
+    assert valet_reg.status_code == 201
+    valet_id = valet_reg.json()["user_id"]
+
+    # 7. Admin Rejects Valet User -> REJECTED
+    rej_res = await client.put(f"/admin/users/{valet_id}/status", headers=admin_headers, json={"status": "REJECTED"})
+    assert rej_res.status_code == 200
+    assert rej_res.json()["status"] == "REJECTED"
+
+    # 8. Rejected user login attempt -> 401 Unauthorized
+    valet_login_fail = await client.post("/auth/login", json={"email": "valetdave@astra.com", "password": "Password123!", "role": "VALET"})
+    assert valet_login_fail.status_code == 401
+    assert "rejected" in valet_login_fail.json()["detail"].lower()
+
+

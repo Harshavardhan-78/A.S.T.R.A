@@ -16,8 +16,22 @@ class LPRService:
         detected_plate = ocr_res.get("fields", {}).get("license_plate")
         if not detected_plate:
             # Fallback plate extraction regex
-            match = re.search(r"[A-Z0-9]{4,10}", text.upper())
-            detected_plate = match.group(0) if match else "KA01AB1234"
+            match = re.search(r"[A-Z]{2}[0-9]{2}[A-Z]{1,2}[0-9]{4}", text.upper().replace(" ", ""))
+            if not match:
+                match = re.search(r"[A-Z0-9]{5,10}", text.upper())
+            detected_plate = match.group(0) if match else None
+
+        if not detected_plate:
+            return {
+                "status": "success",
+                "detected_plate": None,
+                "license_plate": None,
+                "normalized_plate": None,
+                "confidence": 0.0,
+                "authorization_status": "NOT_VERIFIED",
+                "vehicle": None,
+                "owner": None,
+            }
 
         normalized_plate = re.sub(r"[^A-Z0-9]", "", detected_plate.upper())
 
@@ -62,6 +76,7 @@ class LPRService:
         return {
             "status": "success",
             "detected_plate": detected_plate,
+            "license_plate": detected_plate,
             "normalized_plate": normalized_plate,
             "confidence": 0.95 if vehicle else 0.80,
             "authorization_status": auth_status,

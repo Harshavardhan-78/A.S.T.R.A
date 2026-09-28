@@ -105,7 +105,10 @@ export default function ValetDashboard() {
           </div>
           <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#f8fafc' }}>Parking Lot Operations</h1>
         </div>
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          <Link to="/shared/ai-utilities" className="btn btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+            <Car size={16} /> Vehicle Damage Inspection
+          </Link>
           <Link to="/valet/assignments" className="btn btn-secondary">
             Assignment Log
           </Link>
