@@ -4,7 +4,7 @@ import LoadingSpinner from '../../components/common/LoadingSpinner';
 import StatusBadge from '../../components/common/StatusBadge';
 import EmptyState from '../../components/common/EmptyState';
 import Modal from '../../components/common/Modal';
-import { ParkingSquare, Plus, AlertCircle, CheckCircle, Layers } from 'lucide-react';
+import { ParkingSquare, Plus, AlertCircle, CheckCircle, Sparkles } from 'lucide-react';
 
 export default function ParkingMgmtPage() {
   const [zones, setZones] = useState([]);
@@ -16,7 +16,15 @@ export default function ParkingMgmtPage() {
   // Modals
   const [isZoneModalOpen, setIsZoneModalOpen] = useState(false);
   const [isSlotModalOpen, setIsSlotModalOpen] = useState(false);
+  const [isGenModalOpen, setIsGenModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // Twin Generator Form
+  const [genForm, setGenForm] = useState({
+    num_floors: 3,
+    slots_per_floor: 20,
+    clear_existing: false
+  });
 
   // Zone Form
   const [zoneForm, setZoneForm] = useState({
@@ -61,6 +69,27 @@ export default function ParkingMgmtPage() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  const handleGenSubmit = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const res = await api.post('/parking/generate-twin-map', {
+        num_floors: parseInt(genForm.num_floors),
+        slots_per_floor: parseInt(genForm.slots_per_floor),
+        clear_existing: genForm.clear_existing
+      });
+      setSuccess(res.data.message || 'Digital Twin layout map generated successfully!');
+      setIsGenModalOpen(false);
+      fetchData();
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to auto-generate twin map layout.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const handleZoneSubmit = async (e) => {
     e.preventDefault();
@@ -125,14 +154,17 @@ export default function ParkingMgmtPage() {
         <div>
           <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#f8fafc' }}>Parking Setup & Digital Twin Configuration</h1>
           <p style={{ color: '#94a3b8', fontSize: '14px', marginTop: '4px' }}>
-            Configure parking zones, floors, coordinates, and individual parking slots.
+            Configure parking zones, floors, coordinates, or auto-generate a complete Digital Twin map.
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          <button className="btn btn-primary" onClick={() => setIsGenModalOpen(true)}>
+            <Sparkles size={16} /> Auto-Generate Twin Map
+          </button>
           <button className="btn btn-secondary" onClick={() => setIsZoneModalOpen(true)}>
             <Plus size={16} /> Add Parking Zone
           </button>
-          <button className="btn btn-primary" onClick={() => setIsSlotModalOpen(true)}>
+          <button className="btn btn-secondary" onClick={() => setIsSlotModalOpen(true)}>
             <Plus size={16} /> Add Parking Slot
           </button>
         </div>
@@ -158,10 +190,10 @@ export default function ParkingMgmtPage() {
         {zones.length === 0 ? (
           <EmptyState
             title="No Zones Configured"
-            description="Create your first parking zone (e.g. Zone A - Ground Floor) to organize slots."
+            description="Auto-generate twin map or create your first parking zone (e.g. Zone A - Ground Floor) to organize slots."
             icon={ParkingSquare}
-            actionLabel="Add Zone"
-            onAction={() => setIsZoneModalOpen(true)}
+            actionLabel="Auto-Generate Twin Map"
+            onAction={() => setIsGenModalOpen(true)}
           />
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
@@ -189,10 +221,10 @@ export default function ParkingMgmtPage() {
         {slots.length === 0 ? (
           <EmptyState
             title="No Slots Configured"
-            description="Add parking slots to zones."
+            description="Auto-generate parking grid or manually add parking slots to zones."
             icon={ParkingSquare}
-            actionLabel="Add Slot"
-            onAction={() => setIsSlotModalOpen(true)}
+            actionLabel="Auto-Generate Twin Map"
+            onAction={() => setIsGenModalOpen(true)}
           />
         ) : (
           <div className="card" style={{ padding: '0', overflow: 'hidden' }}>
@@ -225,6 +257,58 @@ export default function ParkingMgmtPage() {
           </div>
         )}
       </div>
+
+      {/* Auto-Generate Twin Map Modal */}
+      <Modal isOpen={isGenModalOpen} title="Auto-Generate Digital Twin Parking Map" onClose={() => setIsGenModalOpen(false)}>
+        <form onSubmit={handleGenSubmit}>
+          <p style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '16px' }}>
+            Specify the number of floors and slots per floor to auto-generate all zones, parking slots, coordinates, and sensors.
+          </p>
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', fontSize: '13px', color: '#cbd5e1', marginBottom: '6px' }}>Number of Floors *</label>
+            <input
+              type="number"
+              min="1"
+              max="20"
+              className="input-field"
+              placeholder="e.g. 3"
+              value={genForm.num_floors}
+              onChange={(e) => setGenForm({ ...genForm, num_floors: e.target.value })}
+              required
+            />
+          </div>
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', fontSize: '13px', color: '#cbd5e1', marginBottom: '6px' }}>Slots per Floor *</label>
+            <input
+              type="number"
+              min="1"
+              max="200"
+              className="input-field"
+              placeholder="e.g. 20"
+              value={genForm.slots_per_floor}
+              onChange={(e) => setGenForm({ ...genForm, slots_per_floor: e.target.value })}
+              required
+            />
+          </div>
+          <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <input
+              type="checkbox"
+              id="clear_existing_admin"
+              checked={genForm.clear_existing}
+              onChange={(e) => setGenForm({ ...genForm, clear_existing: e.target.checked })}
+            />
+            <label htmlFor="clear_existing_admin" style={{ fontSize: '13px', color: '#cbd5e1', cursor: 'pointer' }}>
+              Clear / Reset existing parking zones & slots
+            </label>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+            <button type="button" className="btn btn-secondary" onClick={() => setIsGenModalOpen(false)}>Cancel</button>
+            <button type="submit" className="btn btn-primary" disabled={submitting}>
+              <Sparkles size={16} /> {submitting ? 'Generating...' : 'Generate Map'}
+            </button>
+          </div>
+        </form>
+      </Modal>
 
       {/* Add Zone Modal */}
       <Modal isOpen={isZoneModalOpen} title="Create Parking Zone" onClose={() => setIsZoneModalOpen(false)}>

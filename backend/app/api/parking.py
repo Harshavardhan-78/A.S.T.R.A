@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.dependencies import get_current_user, require_roles
 from app.database.dependencies import get_db
 from app.schemas.parking import (
+    GenerateTwinMapRequest,
     ParkingAssignRequest,
     ParkingAssignmentResponse,
     ParkingReleaseRequest,
@@ -12,6 +13,7 @@ from app.schemas.parking import (
     ParkingZoneCreate,
     ParkingZoneResponse,
 )
+from app.services.digital_twin_service import DigitalTwinService
 from app.services.parking_service import ParkingService
 
 
@@ -19,6 +21,22 @@ router = APIRouter(
     prefix="/parking",
     tags=["Parking"],
 )
+
+
+@router.post("/generate-twin-map")
+async def generate_twin_map(
+    request: GenerateTwinMapRequest,
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await DigitalTwinService.generate_twin_layout(
+        db,
+        num_floors=request.num_floors,
+        slots_per_floor=request.slots_per_floor,
+        slots_per_zone=request.slots_per_zone,
+        clear_existing=request.clear_existing,
+    )
+
 
 
 @router.get("/zones", response_model=list[ParkingZoneResponse])

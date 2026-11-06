@@ -4,7 +4,7 @@ import LoadingSpinner from '../../components/common/LoadingSpinner';
 import StatusBadge from '../../components/common/StatusBadge';
 import StatCard from '../../components/common/StatCard';
 import Modal from '../../components/common/Modal';
-import { LayoutGrid, Layers, RefreshCw, Car, CheckCircle, AlertTriangle, Radio } from 'lucide-react';
+import { LayoutGrid, Layers, RefreshCw, Car, CheckCircle, Radio, Sparkles, Plus, AlertCircle } from 'lucide-react';
 
 export default function DigitalTwinView() {
   const [layout, setLayout] = useState(null);
@@ -12,9 +12,19 @@ export default function DigitalTwinView() {
   const [selectedFloor, setSelectedFloor] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [successMsg, setSuccessMsg] = useState(null);
 
   // Selected slot inspect modal
   const [inspectedSlot, setInspectedSlot] = useState(null);
+
+  // Twin Generator Modal
+  const [isGenModalOpen, setIsGenModalOpen] = useState(false);
+  const [genForm, setGenForm] = useState({
+    num_floors: 3,
+    slots_per_floor: 20,
+    clear_existing: false
+  });
+  const [genSubmitting, setGenSubmitting] = useState(false);
 
   const fetchLayoutData = async () => {
     setLoading(true);
@@ -24,10 +34,11 @@ export default function DigitalTwinView() {
         api.get('/digital-twin/layout'),
         api.get('/digital-twin/floors')
       ]);
-      setLayout(lRes.data || {});
+      const layoutData = lRes.data || {};
+      setLayout(layoutData);
       const flList = fRes.data || [];
       setFloors(flList);
-      if (flList.length > 0 && !selectedFloor) {
+      if (flList.length > 0 && (!selectedFloor || !flList.includes(selectedFloor))) {
         setSelectedFloor(flList[0]);
       }
     } catch (err) {
@@ -42,17 +53,47 @@ export default function DigitalTwinView() {
     fetchLayoutData();
   }, []);
 
+  const handleGenerateSubmit = async (e) => {
+    e.preventDefault();
+    setGenSubmitting(true);
+    setError(null);
+    setSuccessMsg(null);
+    try {
+      const numF = parseInt(genForm.num_floors);
+      const slotsF = parseInt(genForm.slots_per_floor);
+      const res = await api.post('/digital-twin/generate', {
+        num_floors: numF,
+        slots_per_floor: slotsF,
+        clear_existing: genForm.clear_existing
+      });
+
+      setSuccessMsg(res.data.message || `Successfully generated twin map layout (${numF} floors, ${slotsF} slots/floor).`);
+      setIsGenModalOpen(false);
+      
+      if (res.data.layout) {
+        setLayout(res.data.layout);
+        const fls = res.data.layout.floors || [];
+        setFloors(fls);
+        if (fls.length > 0) setSelectedFloor(fls[0]);
+      } else {
+        fetchLayoutData();
+      }
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to auto-generate twin map layout.');
+    } finally {
+      setGenSubmitting(false);
+    }
+  };
+
   if (loading) return <LoadingSpinner label="Rendering 2D Digital Twin Layout..." />;
 
   const zones = layout?.zones || [];
   const slots = layout?.slots || [];
   const sensors = layout?.sensors || [];
-  const nodes = layout?.nodes || [];
 
   // Filter by selected floor
   const filteredZones = selectedFloor ? zones.filter(z => z.floor === selectedFloor) : zones;
   const filteredSlotIds = new Set(filteredZones.map(z => z.id));
-  const filteredSlots = selectedFloor ? slots.filter(s => filteredSlotIds.has(s.zone_id)) : slots;
 
   const totalSlots = slots.length;
   const occupiedSlots = slots.filter(s => s.status === 'OCCUPIED').length;
@@ -68,14 +109,28 @@ export default function DigitalTwinView() {
           </div>
           <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#f8fafc' }}>Facility Telemetry & Parking Grid Map</h1>
         </div>
-        <button className="btn btn-secondary" onClick={fetchLayoutData}>
-          <RefreshCw size={16} /> Sync Telemetry
-        </button>
+
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button className="btn btn-primary" onClick={() => setIsGenModalOpen(true)}>
+            <Sparkles size={16} /> Auto-Generate Twin Map
+          </button>
+          <button className="btn btn-secondary" onClick={fetchLayoutData}>
+            <RefreshCw size={16} /> Sync Telemetry
+          </button>
+        </div>
       </div>
 
       {error && (
-        <div style={{ padding: '12px 16px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#f87171', marginBottom: '20px' }}>
-          {error}
+        <div style={{ padding: '12px 16px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#f87171', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <AlertCircle size={18} />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {successMsg && (
+        <div style={{ padding: '12px 16px', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#34d399', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <CheckCircle size={18} />
+          <span>{successMsg}</span>
         </div>
       )}
 
@@ -87,9 +142,53 @@ export default function DigitalTwinView() {
         <StatCard title="Telemetry Sensors" value={sensors.length || 12} icon={Radio} color="#8b5cf6" />
       </div>
 
+      {/* Quick Generator Shortcut Bar if no slots */}
+      {slots.length === 0 && (
+        <div className="card" style={{ marginBottom: '24px', padding: '24px', border: '1px solid rgba(56, 189, 248, 0.4)', background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.9), rgba(30, 41, 59, 0.8))' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+            <Sparkles size={24} style={{ color: '#38bdf8' }} />
+            <div>
+              <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#f8fafc' }}>No Parking Grid Layout Found</h3>
+              <p style={{ fontSize: '13px', color: '#94a3b8', marginTop: '2px' }}>
+                Enter the number of floors and slots per floor to instantly generate a complete 2D Digital Twin API map.
+              </p>
+            </div>
+          </div>
+          <form onSubmit={handleGenerateSubmit} style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'flex-end', marginTop: '16px' }}>
+            <div style={{ minWidth: '160px' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: '#cbd5e1', marginBottom: '4px', fontWeight: '600' }}>Number of Floors</label>
+              <input
+                type="number"
+                min="1"
+                max="20"
+                className="input-field"
+                value={genForm.num_floors}
+                onChange={(e) => setGenForm({ ...genForm, num_floors: e.target.value })}
+                required
+              />
+            </div>
+            <div style={{ minWidth: '180px' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: '#cbd5e1', marginBottom: '4px', fontWeight: '600' }}>Slots per Floor</label>
+              <input
+                type="number"
+                min="1"
+                max="200"
+                className="input-field"
+                value={genForm.slots_per_floor}
+                onChange={(e) => setGenForm({ ...genForm, slots_per_floor: e.target.value })}
+                required
+              />
+            </div>
+            <button type="submit" className="btn btn-primary" disabled={genSubmitting}>
+              <Sparkles size={16} /> {genSubmitting ? 'Generating Map...' : 'Generate Twin Map Now'}
+            </button>
+          </form>
+        </div>
+      )}
+
       {/* Floor Filter Tabs */}
       {floors.length > 0 && (
-        <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
           {floors.map((fl) => (
             <button
               key={fl}
@@ -128,7 +227,7 @@ export default function DigitalTwinView() {
         {/* Render Zones and Slots Grid */}
         {filteredZones.length === 0 && slots.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 0', color: '#94a3b8' }}>
-            No Digital Twin layout items configured for this floor view.
+            No Digital Twin layout items configured for this floor view. Click "Auto-Generate Twin Map" to create a complete parking grid automatically.
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -196,6 +295,68 @@ export default function DigitalTwinView() {
           </div>
         )}
       </div>
+
+      {/* Auto-Generate Twin Map Modal */}
+      <Modal
+        isOpen={isGenModalOpen}
+        title="Auto-Generate Digital Twin Parking Map"
+        onClose={() => setIsGenModalOpen(false)}
+      >
+        <form onSubmit={handleGenerateSubmit}>
+          <p style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '16px' }}>
+            Enter facility parameters to automatically generate parking floors, zones, slots, coordinates, and telemetry sensors.
+          </p>
+
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', fontSize: '13px', color: '#cbd5e1', marginBottom: '6px' }}>Number of Floors *</label>
+            <input
+              type="number"
+              min="1"
+              max="20"
+              className="input-field"
+              placeholder="e.g. 3"
+              value={genForm.num_floors}
+              onChange={(e) => setGenForm({ ...genForm, num_floors: e.target.value })}
+              required
+            />
+          </div>
+
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', fontSize: '13px', color: '#cbd5e1', marginBottom: '6px' }}>Slots per Floor *</label>
+            <input
+              type="number"
+              min="1"
+              max="200"
+              className="input-field"
+              placeholder="e.g. 20"
+              value={genForm.slots_per_floor}
+              onChange={(e) => setGenForm({ ...genForm, slots_per_floor: e.target.value })}
+              required
+            />
+          </div>
+
+          <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <input
+              type="checkbox"
+              id="clear_existing"
+              checked={genForm.clear_existing}
+              onChange={(e) => setGenForm({ ...genForm, clear_existing: e.target.checked })}
+            />
+            <label htmlFor="clear_existing" style={{ fontSize: '13px', color: '#cbd5e1', cursor: 'pointer' }}>
+              Overwrite / Clear existing parking zones and slots
+            </label>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+            <button type="button" className="btn btn-secondary" onClick={() => setIsGenModalOpen(false)}>
+              Cancel
+            </button>
+            <button type="submit" className="btn btn-primary" disabled={genSubmitting}>
+              <Sparkles size={16} /> {genSubmitting ? 'Generating Map...' : 'Generate Map'}
+            </button>
+          </div>
+        </form>
+      </Modal>
 
       {/* Inspect Slot Detail Modal */}
       <Modal

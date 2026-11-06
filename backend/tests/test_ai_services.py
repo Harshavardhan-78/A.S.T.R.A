@@ -54,3 +54,32 @@ async def test_ai_services_graceful_fallbacks(client):
     chat_data = chat_res.json()
     assert chat_data["mode"] == "retrieval_only_fallback"
     assert "citations" in chat_data
+
+
+@pytest.mark.asyncio
+async def test_digital_twin_auto_generation(client):
+    # Register & Login Admin for twin generation
+    await client.post(
+        "/auth/register",
+        json={"full_name": "Admin Twin", "email": "twinadmin@astra.com", "password": "Password123!", "role": "ADMIN", "admin_code": "ASTRA_COMMUNITY_ADMIN_2026_SECRET"},
+    )
+    tokens = (await client.post("/auth/login", json={"email": "twinadmin@astra.com", "password": "Password123!", "role": "ADMIN"})).json()
+    headers = {"Authorization": f"Bearer {tokens['access_token']}"}
+
+    # Test auto-generation of 3 floors with 15 slots each
+    gen_res = await client.post(
+        "/digital-twin/generate",
+        headers=headers,
+        json={
+            "num_floors": 3,
+            "slots_per_floor": 15,
+            "clear_existing": True,
+        },
+    )
+    assert gen_res.status_code == 200
+    data = gen_res.json()
+    assert data["status"] == "success"
+    assert data["num_floors"] == 3
+    assert data["created_slots"] == 45
+    assert len(data["layout"]["floors"]) == 3
+    assert len(data["layout"]["slots"]) == 45

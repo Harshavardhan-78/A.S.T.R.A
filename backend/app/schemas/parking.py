@@ -71,3 +71,11 @@ class ParkingAssignmentResponse(BaseModel):
     assigned_at: datetime
     released_at: datetime | None = None
     status: str
+
+
+class GenerateTwinMapRequest(BaseModel):
+    num_floors: int = 3
+    slots_per_floor: int = 20
+    slots_per_zone: int | None = 10
+    clear_existing: bool = False
+
